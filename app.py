@@ -3,47 +3,85 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image
 
-# =====================
-# LOAD LABELS
-# =====================
-with open("labels.txt", "r") as f:
-    class_names = [line.strip() for line in f.readlines()]
+# ===============================
+# KONFIGURASI
+# ===============================
+st.set_page_config(
+    page_title="Shark Species Identifier",
+    layout="centered"
+)
 
-# =====================
-# LOAD TFLITE MODEL
-# =====================
-interpreter = tf.lite.Interpreter(model_path="shark_model.tflite")
-interpreter.allocate_tensors()
+MODEL_PATH = "shark_cnn_model.h5"
 
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+CLASS_NAMES = [
+    "tiger_shark",
+    "whale_shark",
+    "white_shark",
+    "whitetip_shark",
+    # lanjutkan sampai 14 kelas
+    # URUTANNYA HARUS SAMA DENGAN TRAINING
+]
 
-IMG_SIZE = 224
+IMG_SIZE = (224, 224)
 
-# =====================
-# STREAMLIT UI
-# =====================
-st.title("🦈 Shark Species Identifier")
-st.write("Upload foto hiu, model akan memprediksi spesiesnya")
+# ===============================
+# LOAD MODEL
+# ===============================
+@st.cache_resource
+def load_model():
+    return tf.keras.models.load_model(MODEL_PATH)
 
-uploaded_file = st.file_uploader("Upload image", type=["jpg", "png", "jpeg"])
+model = load_model()
 
-if uploaded_file is not None:
-    image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Uploaded Image", use_column_width=True)
-
-    # Preprocess
-    image = image.resize((IMG_SIZE, IMG_SIZE))
-    img_array = np.array(image, dtype=np.float32) / 255.0
+# ===============================
+# PREPROCESS IMAGE
+# ===============================
+def preprocess_image(image: Image.Image):
+    image = image.convert("RGB")
+    image = image.resize(IMG_SIZE)
+    img_array = np.array(image) / 255.0
     img_array = np.expand_dims(img_array, axis=0)
+    return img_array
 
-    # Predict
-    interpreter.set_tensor(input_details[0]['index'], img_array)
-    interpreter.invoke()
-    predictions = interpreter.get_tensor(output_details[0]['index'])
+# ===============================
+# UI
+# ===============================
+st.title("🦈 Shark Species Identifier (CNN)")
+st.write("Upload foto hiu, sistem akan memprediksi spesiesnya.")
 
-    predicted_class = class_names[np.argmax(predictions)]
-    confidence = np.max(predictions) * 100
+uploaded_file = st.file_uploader(
+    "Upload gambar hiu",
+    type=["jpg", "jpeg", "png"]
+)
 
-    st.success(f"🦈 Prediction: **{predicted_class}**")
-    st.write(f"Confidence: **{confidence:.2f}%**")
+# ===============================
+# PREDIKSI
+# ===============================
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Gambar yang diupload", use_column_width=True)
+
+    with st.spinner("Menganalisis gambar..."):
+        img_array = preprocess_image(image)
+        predictions = model.predict(img_array)
+        predicted_index = np.argmax(predictions)
+        confidence = predictions[0][predicted_index]
+
+    st.success("Prediksi selesai!")
+
+    st.markdown(f"""
+    ### 🦈 Hasil Prediksi:
+    **Spesies:** `{CLASS_NAMES[predicted_index]}`  
+    **Confidence:** `{confidence*100:.2f}%`
+    """)
+
+    # ===============================
+    # TOP 3 PREDICTION
+    # ===============================
+    st.write("### 🔍 Top 3 Prediksi:")
+    top_3_idx = np.argsort(predictions[0])[::-1][:3]
+
+    for i in top_3_idx:
+        st.write(
+            f"- {CLASS_NAMES[i]} : {predictions[0][i]*100:.2f}%"
+        )
