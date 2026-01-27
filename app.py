@@ -4,56 +4,46 @@ import numpy as np
 from PIL import Image
 
 # =====================
-# LOAD MODEL
+# LOAD LABELS
 # =====================
-MODEL_PATH = "shark_model.h5"
-model = tf.keras.models.load_model(MODEL_PATH)
+with open("labels.txt", "r") as f:
+    class_names = [line.strip() for line in f.readlines()]
 
 # =====================
-# CLASS LABELS
-# ⚠️ HARUS SAMA PERSIS DENGAN HASIL train_data.class_indices
+# LOAD TFLITE MODEL
 # =====================
-CLASS_NAMES = [
-    "tiger_shark",
-    "whale_shark",
-    "white_shark",
-    "whitetip_shark"
-]
+interpreter = tf.lite.Interpreter(model_path="shark_model.tflite")
+interpreter.allocate_tensors()
+
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+IMG_SIZE = 224
 
 # =====================
-# UI
+# STREAMLIT UI
 # =====================
-st.set_page_config(page_title="Shark Identifier", page_icon="🦈")
 st.title("🦈 Shark Species Identifier")
-st.write("Upload gambar hiu, model akan mendeteksi spesiesnya.")
+st.write("Upload foto hiu, model akan memprediksi spesiesnya")
 
-uploaded_file = st.file_uploader(
-    "Upload image",
-    type=["jpg", "jpeg", "png"]
-)
+uploaded_file = st.file_uploader("Upload image", type=["jpg", "png", "jpeg"])
 
-# =====================
-# PREDICTION FUNCTION
-# =====================
-def predict(image):
-    image = image.resize((224, 224))
-    img_array = np.array(image) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
-
-    predictions = model.predict(img_array)
-    class_index = np.argmax(predictions)
-    confidence = predictions[0][class_index]
-
-    return CLASS_NAMES[class_index], confidence
-
-# =====================
-# RUN
-# =====================
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
     st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    label, conf = predict(image)
+    # Preprocess
+    image = image.resize((IMG_SIZE, IMG_SIZE))
+    img_array = np.array(image, dtype=np.float32) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
 
-    st.markdown(f"### 🦈 Prediksi: **{label.replace('_', ' ').title()}**")
-    st.markdown(f"### 🔍 Confidence: **{conf*100:.2f}%**")
+    # Predict
+    interpreter.set_tensor(input_details[0]['index'], img_array)
+    interpreter.invoke()
+    predictions = interpreter.get_tensor(output_details[0]['index'])
+
+    predicted_class = class_names[np.argmax(predictions)]
+    confidence = np.max(predictions) * 100
+
+    st.success(f"🦈 Prediction: **{predicted_class}**")
+    st.write(f"Confidence: **{confidence:.2f}%**")
