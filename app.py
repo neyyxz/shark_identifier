@@ -11,15 +11,23 @@ st.set_page_config(
     layout="centered"
 )
 
-MODEL_PATH = "shark_cnn_model.h5"
+MODEL_PATH = "shark_model.keras"
 
 CLASS_NAMES = [
+    "basking_shark",
+    "blacktip_shark",
+    "blue_shark",
+    "bull_shark",
+    "hammerhead_shark",
+    "lemon_shark",
+    "mako_shark",
+    "nurse_shark",
+    "sand_tiger_shark",
+    "thresher_shark",
     "tiger_shark",
     "whale_shark",
     "white_shark",
     "whitetip_shark",
-    # lanjutkan sampai 14 kelas
-    # URUTANNYA HARUS SAMA DENGAN TRAINING
 ]
 
 IMG_SIZE = (224, 224)
@@ -46,8 +54,9 @@ def preprocess_image(image: Image.Image):
 # ===============================
 # UI
 # ===============================
-st.title("🦈 Shark Species Identifier (CNN)")
+st.title("🦈 Shark Species Identifier")
 st.write("Upload foto hiu, sistem akan memprediksi spesiesnya.")
+st.write("Sistem ini menggunakan model berbasis CNN (Convolutional Neural Network) yang sudah dilatih dan memiliki tingkat akuarasi tinggi")
 
 uploaded_file = st.file_uploader(
     "Upload gambar hiu",

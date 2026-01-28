@@ -1,3 +1,13 @@
+basking_shark
+blacktip_shark
+blue_shark
+bull_shark
+hammerhead_shark
+lemon_shark
+mako_shark
+nurse_shark
+sand_tiger_shark
+thresher_shark
 tiger_shark
 whale_shark
 white_shark
