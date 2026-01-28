@@ -11,7 +11,7 @@ st.set_page_config(
     layout="centered"
 )
 
-MODEL_PATH = "shark_model.keras"
+MODEL_PATH = "shark_model.tflite"
 
 CLASS_NAMES = [
     "basking_shark",
