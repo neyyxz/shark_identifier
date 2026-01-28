@@ -3,15 +3,18 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image
 
-# ===============================
-# KONFIGURASI
-# ===============================
-st.set_page_config(
-    page_title="Shark Species Identifier",
-    layout="centered"
-)
-
 MODEL_PATH = "shark_model.tflite"
+
+@st.cache_resource
+def load_tflite_model():
+    interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
+    interpreter.allocate_tensors()
+    return interpreter
+
+interpreter = load_tflite_model()
+
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
 CLASS_NAMES = [
     "basking_shark",
@@ -30,67 +33,28 @@ CLASS_NAMES = [
     "whitetip_shark",
 ]
 
-IMG_SIZE = (224, 224)
-
-# ===============================
-# LOAD MODEL
-# ===============================
-@st.cache_resource
-def load_model():
-    return tf.keras.models.load_model(MODEL_PATH)
-
-model = load_model()
-
-# ===============================
-# PREPROCESS IMAGE
-# ===============================
-def preprocess_image(image: Image.Image):
-    image = image.convert("RGB")
-    image = image.resize(IMG_SIZE)
-    img_array = np.array(image) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
-    return img_array
-
-# ===============================
-# UI
-# ===============================
 st.title("🦈 Shark Species Identifier")
 st.write("Upload foto hiu, sistem akan memprediksi spesiesnya.")
 st.write("Sistem ini menggunakan model berbasis CNN (Convolutional Neural Network) yang sudah dilatih dan memiliki tingkat akuarasi tinggi")
 
-uploaded_file = st.file_uploader(
-    "Upload gambar hiu",
-    type=["jpg", "jpeg", "png"]
-)
+uploaded_file = st.file_uploader("Upload image", type=["jpg", "png", "jpeg"])
 
-# ===============================
-# PREDIKSI
-# ===============================
-if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Gambar yang diupload", use_column_width=True)
+if uploaded_file:
+    image = Image.open(uploaded_file).convert("RGB")
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    with st.spinner("Menganalisis gambar..."):
-        img_array = preprocess_image(image)
-        predictions = model.predict(img_array)
-        predicted_index = np.argmax(predictions)
-        confidence = predictions[0][predicted_index]
+    img = image.resize((224, 224))
+    img_array = np.array(img).astype(np.float32) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
 
-    st.success("Prediksi selesai!")
+    interpreter.set_tensor(input_details[0]["index"], img_array)
+    interpreter.invoke()
 
-    st.markdown(f"""
-    ### 🦈 Hasil Prediksi:
-    **Spesies:** `{CLASS_NAMES[predicted_index]}`  
-    **Confidence:** `{confidence*100:.2f}%`
-    """)
+    prediction = interpreter.get_tensor(output_details[0]["index"])
 
-    # ===============================
-    # TOP 3 PREDICTION
-    # ===============================
-    st.write("### 🔍 Top 3 Prediksi:")
-    top_3_idx = np.argsort(predictions[0])[::-1][:3]
+    class_idx = np.argmax(prediction)
+    confidence = np.max(prediction)
 
-    for i in top_3_idx:
-        st.write(
-            f"- {CLASS_NAMES[i]} : {predictions[0][i]*100:.2f}%"
-        )
+    st.subheader(f"Prediction: {CLASS_NAMES[class_idx]}")
+    st.write(f"Confidence: {confidence:.2%}")
+
